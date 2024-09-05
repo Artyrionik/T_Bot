@@ -5,8 +5,6 @@ VisualStudioVersion = 17.9.34622.214
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "T_Bot", "T_Bot\T_Bot.csproj", "{97A52105-FF63-44F8-BC10-D4D5B13E632D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Entity", "..\Entity\Entity\Entity.csproj", "{763FBE0B-CB32-4C3D-A0DA-3B0412D7E1D5}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,10 +15,6 @@ Global
 		{97A52105-FF63-44F8-BC10-D4D5B13E632D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{97A52105-FF63-44F8-BC10-D4D5B13E632D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{97A52105-FF63-44F8-BC10-D4D5B13E632D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{763FBE0B-CB32-4C3D-A0DA-3B0412D7E1D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{763FBE0B-CB32-4C3D-A0DA-3B0412D7E1D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{763FBE0B-CB32-4C3D-A0DA-3B0412D7E1D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{763FBE0B-CB32-4C3D-A0DA-3B0412D7E1D5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

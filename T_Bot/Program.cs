@@ -19,7 +19,6 @@ namespace T_Bot
     {
         static List<Pattern> patterns;
         static bool QouteIsActive = false;
-        static bool IsSearching = false;
         const string firstMenu = "<b>Стартовое Меню</b>\n\n";
         const string secondMenu = "<b>Меню</b>\n\n";
         static string Weathermenu = $"<b>Погода на сегодня:\n</b>";
@@ -129,10 +128,12 @@ namespace T_Bot
                     {
                         await HandleCommand(user.Id, text, user);
                     }
-                    if (IsSearching)
+                    using (ApplicationContext db = new ApplicationContext())
                     {
-                        using (ApplicationContext db = new ApplicationContext())
+                        UserEntity current_user = UserEntity.GetUserFromDb(user.Id);
+                        if (current_user.IsSearching)
                         {
+
                              patterns = (from pat in db.Patterns
                                             where pat.Name!.Contains(text)
                                             select pat).ToList();
@@ -197,8 +198,8 @@ namespace T_Bot
         {
             await Console.Error.WriteLineAsync(exception.Message);
         }
-        
-        static async Task HandleCommand(long userId,string command,User user)
+
+        static async Task HandleCommand(long userId, string command, User user)
         {
             switch(command)
             {             
@@ -206,6 +207,7 @@ namespace T_Bot
                     await bot.SendTextMessageAsync(userId,$"Привет {user.FirstName ?? user.Username}");
                     break;
                 case "/start":
+                    UserEntity.SetDbEntity(userId); 
                     await bot.SendTextMessageAsync(userId, $"Привет {user.FirstName ?? user.Username}");
                     await SendMenu(userId, firstMenuMarkup,firstMenu);
                     break;
@@ -296,7 +298,8 @@ namespace T_Bot
             InlineKeyboardMarkup markup = new(Array.Empty<InlineKeyboardButton>());
             try
             {
-                if (IsSearching)
+                UserEntity user = UserEntity.GetUserFromDb(menuQ.From.Id);
+                if (user.IsSearching)
                 {
                     foreach(var pat in patterns)
                     {
@@ -310,7 +313,8 @@ namespace T_Bot
                             
                         }
                     }
-                    IsSearching = false;
+                    user.IsSearching = false;
+                    UserEntity.UpdateUserDB(user);
                     Text = firstMenu;
                     markup = firstMenuMarkup;
                 }
@@ -334,7 +338,8 @@ namespace T_Bot
                             break;
                         case "Поиск файла":
                             Text = "Введите примерное имя файла";
-                            IsSearching = true;
+                            user.IsSearching = true;
+                            UserEntity.UpdateUserDB(user);
                             break;
 
                     }
