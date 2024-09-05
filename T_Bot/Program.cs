@@ -137,34 +137,43 @@ namespace T_Bot
                                             where pat.Name!.Contains(text)
                                             select pat).ToList();
                             var kb = new List<InlineKeyboardButton[]>();
-                            InlineKeyboardButton[][] buttons = new InlineKeyboardButton[patterns.Count][];
+                            int size_of_buttons_list  = patterns.Count/2 + patterns.Count%2;
+                            InlineKeyboardButton[][] buttons = new InlineKeyboardButton[size_of_buttons_list][];
                             int i = 0;
                             int j = 0;
-                            for (int k = 0; k < patterns.Count/2+patterns.Count%2; k++)
+                            for (int k = 0; k < size_of_buttons_list; k++)
                             {
                                 buttons[k] = new InlineKeyboardButton[2];
                             }
+                            if(patterns.Count%2 != 0)
+                                buttons[^1]= new InlineKeyboardButton[1];
                             
                             foreach (var pat in patterns)
                             {
-                                
+                                if (pat.Name.Length >31) 
+                                pat.Name = pat.Name.Substring(0,32);
                                 buttons[i][j] = InlineKeyboardButton.WithCallbackData(pat.Name);
-                                
                                 Console.WriteLine($"Id:{pat.Id} Name:{pat.Name} Path:{pat.Path}");
+
+                                if (i == size_of_buttons_list - 1 && patterns.Count % 2 != 0)
+                                {
+                                    kb.Add(buttons[i]);
+                                    break;
+                                }                                
                                 if(j<1)
                                 {
                                     j++;
 
-                                }
+                                }                                
                                 else
                                 {
                                     kb.Add(buttons[i]);
-                                    i ++;j = 0;
-                                    
-                                }
+                                    i++; j = 0;
+
+                                }                                
                             }
                             DownloadMarkup = kb.ToArray();
-                            await bot.SendTextMessageAsync(user.Id,"Выберите файл", 0, ParseMode.Html, replyMarkup:DownloadMarkup);
+                            await bot.SendTextMessageAsync(user.Id, "<b>Выберите файл</b>\n\n", 0, ParseMode.Html, replyMarkup:DownloadMarkup);
 
 
 
@@ -291,7 +300,7 @@ namespace T_Bot
                 {
                     foreach(var pat in patterns)
                     {
-                        if (menuQ.Data == pat.Name)
+                        if (menuQ.Data.StartsWith(pat.Name!))
                         {
                             using FileStream fs = new FileStream(pat.Path, FileMode.Open, FileAccess.Read, FileShare.Inheritable);
                             {
@@ -355,7 +364,8 @@ namespace T_Bot
                 await bot.DownloadFileAsync(file.FilePath!,fs);
                 using (ApplicationContext db = new ApplicationContext())
                 {
-                    db.Patterns.Add(new Pattern(fileName.ToLower(),path+fileName.ToLower()));
+                    
+                    db.Patterns.Update(new Pattern(fileName.ToLower(),path+fileName.ToLower()));
                     db.SaveChanges();
                 }
                     fs.Close();

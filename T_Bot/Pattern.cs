@@ -11,5 +11,9 @@
             Name = name;
             Path = path;
         }
+        public Pattern(int id, string? name, string? path):this( name, path)
+        {
+            Id = id;
+        }
     }
 }
