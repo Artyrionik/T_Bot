@@ -12,46 +12,48 @@ using Telegram.Bot.Types.ReplyMarkups;
 using static System.Net.Mime.MediaTypeNames;
 using TelegramBotFramework.Core.Objects;
 using File = System.IO.File;
+using System.Collections.ObjectModel;
 
 namespace T_Bot
 {
     class Program
     {
         static List<Pattern> patterns;
+        static List<string> patterns_reply = new List<string>();
         static bool QouteIsActive = false;
         const string firstMenu = "<b>Стартовое Меню</b>\n\n";
         const string secondMenu = "<b>Меню</b>\n\n";
         static string Weathermenu = $"<b>Погода на сегодня:\n</b>";
 
-        static string NextButton = "Далее";
-        static string BackButton = "Назад";
-        static string WeatherButton = "Погода";
-        static string FileSearch = "Поиск файла";
+        static string NextButton = "Далее ▶";
+        static string BackButton = "◀ Назад";
+        static string WeatherButton = "🌄 Погода";
+        static string FileSearch = "🔎 Поиск файла";
         static string Tutorial = "Туториал";
         static string FilePath = @"D:\TelegramBot\Archive\";
+        static int MessageId;
 
-        
-        static InlineKeyboardMarkup firstMenuMarkup = new(new[] { InlineKeyboardButton.WithCallbackData(NextButton), InlineKeyboardButton.WithCallbackData(FileSearch) });
+
+        static BotCommand[] commands = new BotCommand[] { new BotCommand() {Command = "/start",Description = "Начало работы" },new BotCommand {Command = "/weather",Description ="Прогноз погоды"} };
+
+        static InlineKeyboardMarkup firstMenuMarkup = new(new[] { InlineKeyboardButton.WithCallbackData(FileSearch), InlineKeyboardButton.WithCallbackData(NextButton) });
         static InlineKeyboardMarkup WeatherMenuMarkup = new( new[] { InlineKeyboardButton.WithCallbackData(BackButton) });
         static InlineKeyboardMarkup secondMenuMarkup = new(
             new[] {
-        new[] { InlineKeyboardButton.WithCallbackData(BackButton) },
-        new[] { InlineKeyboardButton.WithUrl(Tutorial, "https://www.youtube.com/watch?v=dQw4w9WgXcQ") },
-        new[]{InlineKeyboardButton.WithCallbackData(WeatherButton)}
-            }
-        );
-        static InlineKeyboardMarkup DownloadMarkup;
+        new[] { InlineKeyboardButton.WithCallbackData(WeatherButton),InlineKeyboardButton.WithUrl(Tutorial, "https://www.youtube.com/watch?v=dQw4w9WgXcQ") },
+        new[] {InlineKeyboardButton.WithCallbackData(BackButton)}});
 
-        static TelegramBotClient bot;
+        static InlineKeyboardMarkup DownloadMarkup;
+        static TelegramBotClient bot;         
 
         static void Main(string[] args)
         {
-            int offset = 0;
             string token = System.IO.File.ReadAllText("token.txt");
 
             bot = new TelegramBotClient(token);            
             Update update = new();
-            using var cts = new CancellationTokenSource();
+            using var cts = new CancellationTokenSource();           
+            bot.SetMyCommandsAsync(commands);
             bot.StartReceiving(updateHandler: onUpdateReceived,errorHandler: HandleError,cancellationToken: cts.Token);
             
             Console.WriteLine("Start listening for updates. Press enter to stop");
@@ -135,8 +137,9 @@ namespace T_Bot
                         {
 
                              patterns = (from pat in db.Patterns
-                                            where pat.Name!.Contains(text)
+                                            where pat.Name!.Contains(text.ToLower())
                                             select pat).ToList();
+                            patterns.Sort(Pattern.Compare);
                             var kb = new List<InlineKeyboardButton[]>();
                             int size_of_buttons_list  = patterns.Count/2 + patterns.Count%2;
                             InlineKeyboardButton[][] buttons = new InlineKeyboardButton[size_of_buttons_list][];
@@ -173,8 +176,14 @@ namespace T_Bot
 
                                 }                                
                             }
+                            kb.Add([InlineKeyboardButton.WithCallbackData("Готово")]);
+                            kb.Add([InlineKeyboardButton.WithCallbackData(BackButton)]);
                             DownloadMarkup = kb.ToArray();
-                            await bot.SendTextMessageAsync(user.Id, "<b>Выберите файл</b>\n\n", 0, ParseMode.Html, replyMarkup:DownloadMarkup);
+                            if (DownloadMarkup.InlineKeyboard.Count() > 1)
+                                await bot.EditMessageTextAsync(msg.Chat.Id, MessageId, "<b>Выберите файл</b>\n\n", ParseMode.Html, replyMarkup: DownloadMarkup);
+                            //await bot.SendTextMessageAsync(user.Id, "<b>Выберите файл</b>\n\n", 0, ParseMode.Html, replyMarkup:DownloadMarkup);
+                            else await bot.EditMessageTextAsync(msg.Chat.Id, MessageId, "<b>Такой херни мы не находили</b>\n\n", ParseMode.Html, replyMarkup: DownloadMarkup);
+                            //await bot.SendTextMessageAsync(user.Id, "<b>Такой херни мы не находили</b>\n\n", 0, ParseMode.Html, replyMarkup: DownloadMarkup);
 
 
 
@@ -207,16 +216,15 @@ namespace T_Bot
                     await bot.SendTextMessageAsync(userId,$"Привет {user.FirstName ?? user.Username}");
                     break;
                 case "/start":
-                    UserEntity.SetDbEntity(userId); 
+                    UserEntity.SetDbEntity(userId);
+                    UserEntity userStart = UserEntity.GetUserFromDb(userId);
+                    userStart.IsSearching = false;
+                    UserEntity.SetDbEntity(userId);
                     await bot.SendTextMessageAsync(userId, $"Привет {user.FirstName ?? user.Username}");
                     await SendMenu(userId, firstMenuMarkup,firstMenu);
                     break;
                 case "/weather":
-                   await WeatherThisWeek("https://pogoda7.ru/prognoz/gorod140330-Belarus-Vitsyebskaya_Voblasts-Polatsk/10days/full", user, userId);
-                    break;
-                case "/turnqouats":
-                    Thread.Sleep(1000);
-                    if (QouteIsActive)  GiveQoute("https://www.forbes.ru/forbeslife/dosug/262327-na-vse-vremena-100-vdokhnovlyayushchikh-tsitat", user, userId);
+                   await WeatherThisWeek("https://pogoda7.ru/prognoz/gorod140330-Belarus-Vitsyebskaya_Voblasts-Polatsk/10days/full", user, userId);                   
                     break;
             }
         }
@@ -234,50 +242,10 @@ namespace T_Bot
             str = str.Substring(str.IndexOf(trim) + trim.Length);
             str = str.Remove(str.IndexOf(cut));
             Console.WriteLine(str);
-            await bot.SendTextMessageAsync(userId, $"{user.FirstName} Вот погода на сегодня:\n {str}");
+            await bot.SendTextMessageAsync(userId, $"{user.FirstName} Вот погода на текущее время:\n {str}",0,ParseMode.Html,replyMarkup: WeatherMenuMarkup);
                 
         }
-        static async Task GiveQoute(string Http, User user, long userId)
-        {
-            while(QouteIsActive)
-            {
-                Random rnd = new Random();
-                string trim = "data-index=\"9\" data-type=\"paragraph\" class=\"ywx5e Q0w8z\" style=\"text-align:left;";
-                string cut = "</span></p> <!----> <!----><p itemprop=\"articleBody\" data-index=\"250\"";
-                string trimParse = rnd.Next(70, 100).ToString() + @".&nbsp";
-                string cutParse = "</b></span></p>";
 
-                HttpClient request = new HttpClient();
-                var response = await request.GetAsync(Http);
-                var str = await response.Content.ReadAsStringAsync();
-                /*StreamWriter streamWriter = new StreamWriter(FilePath + "File.txt");
-                streamWriter.Write(str);
-                streamWriter.Close();*/
-                str = str.Substring(str.IndexOf(trim));
-                str = str.Remove(str.IndexOf(cut));
-                str = str.Substring(str.IndexOf(trimParse) + trimParse.Length);
-                str = str.Remove(str.IndexOf(cutParse));
-                //str = str.Replace(";<b>", "");
-                if (str.Contains(".</span></p>"))
-                {
-                    if(str.IndexOf(".</span></p>") != 0)
-                    {
-                        str = str.Remove(str.IndexOf(".</span></p>"));
-                    }                   
-                }
-                if(str.Contains(";"))
-                {
-                    if(str.Contains(";<b>")) { str = str.Substring(str.IndexOf(";<b>")+4); }
-                    
-                    else  str = str.Substring(str.IndexOf(';')+1);
-                }
-                await bot.SendTextMessageAsync(userId, str);
-                Console.WriteLine(str);
-                Thread.Sleep(10000);
-            }
-           
-
-        }
         static async Task WeatherThisWeek(string Http)
         {
             string trim = @"<div class=""grid current_name""><span class=""span_h2"">Сейчас  в Полоцке </span></div><div class=""clear""></div>  <div class=""current_data"">    <div class=""grid image"">      <img title=""";
@@ -299,59 +267,88 @@ namespace T_Bot
             try
             {
                 UserEntity user = UserEntity.GetUserFromDb(menuQ.From.Id);
-                if (user.IsSearching)
-                {
-                    foreach(var pat in patterns)
+                if (user.IsSearching && patterns is not null && menuQ.Data is not null)
+                {                                       
+                    if(menuQ.Data == "Готово") 
                     {
-                        if (menuQ.Data.StartsWith(pat.Name!))
+                        foreach (var pat in patterns)
                         {
-                            using FileStream fs = new FileStream(pat.Path, FileMode.Open, FileAccess.Read, FileShare.Inheritable);
-                            {
-                                await bot.SendDocumentAsync(menuQ.Message.Chat.Id,new InputFileStream(fs,pat.Name));
-                            }
-                            fs.Close();
-                            
+                                if (pat.Name.StartsWith("✔️"))
+                                {
+                                    using FileStream fs = new FileStream(pat.Path, FileMode.Open, FileAccess.Read, FileShare.Inheritable);
+                                    {
+                                        await bot.SendDocumentAsync(menuQ.Message.Chat.Id, new InputFileStream(fs, pat.Name));
+                                    }
+                                    fs.Close();
+                                pat.Name = pat.Name.Substring(1);
+                                }                                                                                            
+                                                       
                         }
+                        Text = "";
+                        markup = null;
+                        await SendMenu(user.Id, firstMenuMarkup, firstMenu);
+                        user.IsSearching = false;
+                        UserEntity.UpdateUserDB(user);
+                        patterns_reply.Clear();
                     }
-                    user.IsSearching = false;
-                    UserEntity.UpdateUserDB(user);
-                    Text = firstMenu;
-                    markup = firstMenuMarkup;
+                    else if (menuQ.Data == BackButton)
+                    {
+                        user.IsSearching = false;
+                        UserEntity.UpdateUserDB(user);
+                        patterns.Clear();
+                    }
+                    else if (menuQ.Data.StartsWith("✔️"))
+                    {
+                        menuQ.Data = menuQ.Data.Substring(2);
+                        patterns_reply.Remove(menuQ.Data);
+                        menuQ.Data = "✔️" + menuQ.Data;
+                        await bot.EditMessageTextAsync(menuQ.Message!.Chat.Id, menuQ.Message.MessageId, menuQ.Message.Text!, ParseMode.Html, replyMarkup: GetDownloadMarkup(menuQ.Data));
+                    }
+                    else
+                    {
+                        patterns_reply.Add(menuQ.Data);
+                        await bot.EditMessageTextAsync(menuQ.Message!.Chat.Id, menuQ.Message.MessageId, menuQ.Message.Text!, ParseMode.Html, replyMarkup: GetDownloadMarkup(menuQ.Data));
+                    }
+                   
                 }
-                else
-                {
                     switch (menuQ.Data)
                     {
-                        case "Далее":
+                        case "Далее ▶":
                             Text = secondMenu;
                             markup = secondMenuMarkup;
                             break;
-                        case "Назад":
+                        case "◀ Назад":
                             Text = firstMenu;
                             markup = firstMenuMarkup;
+                            user.IsSearching = false;
+                            UserEntity.UpdateUserDB(user);
                             break;
-                        case "Погода":
+                        case "🌄 Погода":
                             await WeatherThisWeek("https://pogoda7.ru/prognoz/gorod140330-Belarus-Vitsyebskaya_Voblasts-Polatsk/10days/full");
                             //await bot.SendTextMessageAsync(menuQ.Message!.Chat.Id, "/weather");
                             Text = Weathermenu;
                             markup = WeatherMenuMarkup;
                             break;
-                        case "Поиск файла":
+                        case "🔎 Поиск файла":
                             Text = "Введите примерное имя файла";
+                            markup = new[] { InlineKeyboardButton.WithCallbackData(BackButton) }; ;
                             user.IsSearching = true;
                             UserEntity.UpdateUserDB(user);
+                        MessageId = menuQ.Message.MessageId;
                             break;
 
                     }
                 }
-            }
             catch (Exception ex)
             {
                 await bot.AnswerCallbackQueryAsync(menuQ.Id);
             }
             await bot.AnswerCallbackQueryAsync(menuQ.Id);
-
-            await bot.EditMessageTextAsync(menuQ.Message!.Chat.Id,menuQ.Message.MessageId,Text,ParseMode.Html,replyMarkup:markup);
+                      
+            if (markup is null)
+                await bot.DeleteMessageAsync(menuQ.Message!.Chat.Id, menuQ.Message.MessageId);
+            if ( Text!="")
+            await bot.EditMessageTextAsync(menuQ.Message!.Chat.Id, menuQ.Message.MessageId, Text, ParseMode.Html, replyMarkup: markup);
         }
 
         static async Task SendMenu(long userId,InlineKeyboardMarkup markup, string menu)
@@ -359,13 +356,59 @@ namespace T_Bot
             await bot.SendTextMessageAsync(userId, menu,0,ParseMode.Html, replyMarkup: markup);
         }
 
+        static InlineKeyboardMarkup GetDownloadMarkup(string? selected = null)
+        {
+            var kb = new List<InlineKeyboardButton[]>();
+            int size_of_buttons_list = patterns.Count / 2 + patterns.Count % 2;
+            InlineKeyboardButton[][] buttons = new InlineKeyboardButton[size_of_buttons_list][];
+            int i = 0;
+            int j = 0;
+            for (int k = 0; k < size_of_buttons_list; k++)
+            {
+                buttons[k] = new InlineKeyboardButton[2];
+            }
+            if (patterns.Count % 2 != 0)
+                buttons[^1] = new InlineKeyboardButton[1];
+
+            foreach (var pat in patterns)
+            {               
+                if (pat.Name == selected && !pat.Name.StartsWith("✔️"))
+                    pat.Name = "✔️" + selected;
+                if (pat.Name.StartsWith("✔️") && pat.Name == selected)
+                    pat.Name = pat.Name.Substring(2);
+                if (pat.Name.Length > 31)
+                    pat.Name = pat.Name.Substring(0, 32);
+                buttons[i][j] = InlineKeyboardButton.WithCallbackData(pat.Name);
+                Console.WriteLine($"Id:{pat.Id} Name:{pat.Name} Path:{pat.Path}");
+
+                if (i == size_of_buttons_list - 1 && patterns.Count % 2 != 0)
+                {
+                    kb.Add(buttons[i]);
+                    break;
+                }
+                if (j < 1)
+                {
+                    j++;
+
+                }
+                else
+                {
+                    kb.Add(buttons[i]);
+                    i++; j = 0;
+
+                }
+            }
+            kb.Add([InlineKeyboardButton.WithCallbackData("Готово")]);
+            kb.Add([InlineKeyboardButton.WithCallbackData(BackButton)]);
+            return DownloadMarkup = kb.ToArray();
+        } 
 
         static async void Download(string fileId, string fileName,string path)
         {
             try
             {
                 var file = await bot.GetFileAsync(fileId);
-                FileStream fs = new FileStream(path+fileName.ToLower(), FileMode.Create);
+                FileStream fs = new FileStream(path+fileName.ToLower(), FileMode.OpenOrCreate);
                 await bot.DownloadFileAsync(file.FilePath!,fs);
                 using (ApplicationContext db = new ApplicationContext())
                 {
